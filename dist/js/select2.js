@@ -1169,7 +1169,7 @@ S2.define('select2/results',[
       // When the dropdown is closed, aria-expended="false"
       self.$results.attr('aria-expanded', 'false');
       self.$results.attr('aria-hidden', 'true');
-      self.$results.removeAttr('aria-activedescendant');
+      self.$results[0].removeAttribute('aria-activedescendant');
     });
 
     container.on('results:toggle', function () {
@@ -1312,7 +1312,10 @@ S2.define('select2/results',[
             data: data
           });
         } else {
-          self.trigger('close', {});
+          self.trigger('close', {
+            originalEvent: evt,
+            data: data
+          });
         }
 
         return;
@@ -1499,8 +1502,8 @@ S2.define('select2/selection/base',[
     container.on('close', function () {
       // When the dropdown is closed, aria-expanded="false"
       self.$selection.attr('aria-expanded', 'false');
-      self.$selection.removeAttr('aria-activedescendant');
-      self.$selection.removeAttr('aria-owns');
+      self.$selection[0].removeAttribute('aria-activedescendant');
+      self.$selection[0].removeAttribute('aria-owns');
 
       self.$selection.trigger('focus');
 
@@ -1668,7 +1671,7 @@ S2.define('select2/selection/single',[
   SingleSelection.prototype.clear = function () {
     var $rendered = this.$selection.find('.select2-selection__rendered');
     $rendered.empty();
-    $rendered.removeAttr('title'); // clear tooltip on empty
+    $rendered[0].removeAttribute('title'); // clear tooltip on empty
   };
 
   SingleSelection.prototype.display = function (data, container) {
@@ -1700,7 +1703,7 @@ S2.define('select2/selection/single',[
     if (title) {
       $rendered.attr('title', title);
     } else {
-      $rendered.removeAttr('title');
+      $rendered[0].removeAttribute('title');
     }
   };
 
@@ -2099,8 +2102,8 @@ S2.define('select2/selection/search',[
     container.on('close', function () {
       self.$search.val('');
       self.resizeSearch();
-      self.$search.removeAttr('aria-controls');
-      self.$search.removeAttr('aria-activedescendant');
+      self.$search[0].removeAttribute('aria-controls');
+      self.$search[0].removeAttribute('aria-activedescendant');
       self.$search.trigger('focus');
     });
 
@@ -2122,7 +2125,7 @@ S2.define('select2/selection/search',[
       if (params.data._resultId) {
         self.$search.attr('aria-activedescendant', params.data._resultId);
       } else {
-        self.$search.removeAttr('aria-activedescendant');
+        self.$search[0].removeAttribute('aria-activedescendant');
       }
     });
 
@@ -2305,7 +2308,11 @@ S2.define('select2/selection/selectionCss',[
       Utils.copyNonInternalCssClasses($selection[0], this.$element[0]);
     }
 
-    $selection.addClass(selectionCssClass);
+    selectionCssClass.trim().split(' ').forEach(function(cssClass) {
+      if(cssClass.length > 0) {
+        $selection[0].classList.add(cssClass);
+      }
+    });
 
     return $selection;
   };
@@ -3571,6 +3578,12 @@ S2.define('select2/data/select',[
       item._resultId = this.generateResultId(this.container, item);
     }
 
+    if (item.children) {
+        item.children = item.children.map(
+            SelectAdapter.prototype._normalizeItem
+        );
+    }
+
     return $.extend({}, defaults, item);
   };
 
@@ -3737,9 +3750,13 @@ S2.define('select2/data/ajax',[
       var $request = options.transport(options, function (data) {
         var results = self.processResults(data, params);
 
-        if (self.options.get('debug') && window.console && console.error) {
-          // Check to make sure that the response included a `results` key.
-          if (!results || !results.results || !Array.isArray(results.results)) {
+        if (results && results.results && Array.isArray(results.results)) {
+          results.results = results.results.map(
+            AjaxAdapter.prototype._normalizeItem
+          );
+        } else {
+          if (self.options.get('debug') && window.console && console.error) {
+            // Check to make sure that the response included a `results` key.
             console.error(
               'Select2: The AJAX results did not return an array in the ' +
               '`results` key of the response.'
@@ -3751,7 +3768,7 @@ S2.define('select2/data/ajax',[
       }, function () {
         // Attempt to detect if a request was aborted
         // Only works if the transport exposes a status property
-        if ('status' in $request &&
+        if ($request && 'status' in $request &&
             ($request.status === 0 || $request.status === '0')) {
           return;
         }
@@ -4253,8 +4270,8 @@ S2.define('select2/dropdown/search',[
 
     container.on('close', function () {
       self.$search.attr('tabindex', -1);
-      self.$search.removeAttr('aria-controls');
-      self.$search.removeAttr('aria-activedescendant');
+      self.$search[0].removeAttribute('aria-controls');
+      self.$search[0].removeAttribute('aria-activedescendant');
 
       self.$search.val('');
       self.$search.trigger('blur');
@@ -4282,7 +4299,7 @@ S2.define('select2/dropdown/search',[
       if (params.data._resultId) {
         self.$search.attr('aria-activedescendant', params.data._resultId);
       } else {
-        self.$search.removeAttr('aria-activedescendant');
+        self.$search[0].removeAttribute('aria-activedescendant');
       }
     });
   };
@@ -4846,7 +4863,11 @@ S2.define('select2/dropdown/dropdownCss',[
       Utils.copyNonInternalCssClasses($dropdown[0], this.$element[0]);
     }
 
-    $dropdown.addClass(dropdownCssClass);
+    dropdownCssClass.trim().split(' ').forEach(function(cssClass) {
+      if(cssClass.length > 0) {
+        $dropdown[0].classList.add(cssClass);
+      }
+    });
 
     return $dropdown;
   };
@@ -5363,7 +5384,10 @@ S2.define('select2/defaults',[
   };
 
   Defaults.prototype.set = function (key, value) {
-    var camelKey = $.camelCase(key);
+    function upperCaseLetter(_, letter) {
+      return letter.toUpperCase();
+    }
+    var camelKey = key.replace(/-([a-z])/g, upperCaseLetter);
 
     var data = {};
     data[camelKey] = value;
